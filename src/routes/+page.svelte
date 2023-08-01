@@ -2,8 +2,28 @@
 	import '../app.css';
 	import type { PageServerData } from './$types';
 	export let data: PageServerData;
-
 	import { draggable, dropzone } from '$lib/dnd';
+	import { quintOut } from 'svelte/easing';
+	import { crossfade } from 'svelte/transition';
+	import { flip } from 'svelte/animate';
+
+	const [send, receive] = crossfade({
+		duration: (d) => Math.sqrt(d * 200),
+
+		fallback(node, params) {
+			const style = getComputedStyle(node);
+			const transform = style.transform === 'none' ? '' : style.transform;
+
+			return {
+				duration: 600,
+				easing: quintOut,
+				css: (t) => `
+					transform: ${transform} scale(${t});
+					opacity: ${t}
+				`
+			};
+		}
+	});
 </script>
 
 <main>
@@ -15,13 +35,15 @@
 				<h2>{column.label}</h2>
 				{#if cards.length > 0}
 					<ul class="cards">
-						{#each cards as card}
+						{#each cards as card (card.id)}
 							<li
 								class="dropzone"
 								use:dropzone={{
 									dropzoneClass: 'dropzone',
 									dragoverClass: 'dragover',
 									on_drop(draggable_id) {
+                    if (draggable_id === card.id) return;
+                    
 										const dropzone_index_original = data.cards.findIndex((c) => c.id === card.id);
 										const draggable_index_original = data.cards.findIndex(
 											(c) => c.id === draggable_id
@@ -41,20 +63,21 @@
 											column: data.cards[dropzone_index_original].column
 										};
 
-										console.log({
-											original: data.cards,
-											new: arr
-										});
-
 										data = {
 											columns: data.columns,
 											cards: arr
 										};
 									}
 								}}
+								use:draggable={card.id}
+								in:receive={{ key: card.id }}
+								out:send={{ key: card.id }}
+								animate:flip={{ duration: 200 }}
 							>
 								<div class="drop-signal" />
-								<div class="card" use:draggable={card.id}>{card.title}</div>
+								<div class="card">
+									{card.title}
+								</div>
 							</li>
 						{/each}
 					</ul>
